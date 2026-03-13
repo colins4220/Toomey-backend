@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: toomey-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn server:app
+    envVars:
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: FROM_EMAIL
+        sync: false
+      - key: BCC_EMAIL
+        sync: false
