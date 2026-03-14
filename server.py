@@ -244,8 +244,8 @@ www.ToomeyIrrigation.com{prepared_by_line}""".strip()
         pdf_attachment.add_header('Content-Disposition', 'attachment', filename=attach_filename)
         msg.attach(pdf_attachment)
 
-    # Send email
-    with smtplib.SMTP(smtp_host, smtp_port) as server:
+    # Send email (10s timeout so Railway doesn't hang and 502)
+    with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
         server.starttls()
         server.login(smtp_user, smtp_password)
         recipients = [to_email]
