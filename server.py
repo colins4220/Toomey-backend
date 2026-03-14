@@ -13,12 +13,16 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 
+import requests as req_lib
+
 app = Flask(__name__)
 CORS(app)  # Allow requests from iPad
 
 # Directory for temporary PDFs
 PDF_DIR = "/tmp/toomey_pdfs"
 os.makedirs(PDF_DIR, exist_ok=True)
+
+SHEETS_URL = "https://script.google.com/macros/s/AKfycbxzNihd63pA6DrwLyOzIDh4mWBba_hOLOjROwk54ZlFN_0CN0Rbm9wGUciMV-4KlVd5oQ/exec"
 
 @app.route('/health', methods=['GET'])
 def health():
@@ -193,7 +197,22 @@ def send_pdf(pdf_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-def send_email_with_pdf(to_email, customer_name, pdf_path, custom_message="", user_email="", user_name="", user_smtp_password="", subject_override=None, extra_cc=None, attachment_name=None):
+@app.route('/sync-to-sheets', methods=['POST'])
+def sync_to_sheets():
+    """Forward proposal data to Google Sheets via Apps Script"""
+    try:
+        data = request.json
+        data['action'] = 'submit_proposal'
+        resp = req_lib.post(SHEETS_URL, json=data, timeout=15)
+        result = resp.json()
+        return jsonify(result)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+def send_email_with_pdf(to_email, customer_name, pdf_path, custom_message="", user_email="", user_name="", user_smtp_password="", subject_override=None, extra_cc=None, attachment_name=None, accept_url=None):
     """
     Send PDF via email using SMTP.
     If user credentials are provided, use those. Otherwise fall back to environment variables.
@@ -223,11 +242,12 @@ def send_email_with_pdf(to_email, customer_name, pdf_path, custom_message="", us
 
     prepared_by_line = f"\n\nPrepared by: {user_name}\n{user_email}" if user_name else ""
     custom_block = f"\n{custom_message}\n" if custom_message.strip() else ""
+    accept_block = f"\n\nTo accept this proposal, click here:\n{accept_url}\n" if accept_url else ""
 
     body = f"""Hi {customer_name},
 
 Please find your W.L. Toomey Irrigation proposal attached.
-{custom_block}
+{custom_block}{accept_block}
 If you have any questions, please don't hesitate to reach out.
 
 Best regards,
@@ -275,6 +295,7 @@ def send_job_pdf():
         smtp_password   = data.get('smtp_password', '')
         message         = data.get('message', '')
         cc_office       = data.get('cc_office', True)
+        accept_url      = data.get('accept_url', None)
 
         if not to_email:
             return jsonify({"error": "No customer email provided"}), 400
@@ -301,7 +322,8 @@ def send_job_pdf():
             user_smtp_password=smtp_password,
             subject_override=subject,
             extra_cc=office_email,
-            attachment_name=filename
+            attachment_name=filename,
+            accept_url=accept_url
         )
 
         # Clean up temp file
