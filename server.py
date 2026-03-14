@@ -202,7 +202,7 @@ def send_email_with_pdf(to_email, customer_name, pdf_path, custom_message="", us
     smtp_password = user_smtp_password if user_smtp_password else os.environ.get('SMTP_PASSWORD')
     from_email = user_email if user_email else os.environ.get('FROM_EMAIL', smtp_user)
 
-    smtp_host = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
+    smtp_host = os.environ.get('SMTP_HOST', 'smtp.office365.com')
     smtp_port = int(os.environ.get('SMTP_PORT', 587))
     bcc_email = os.environ.get('BCC_EMAIL')  # Optional BCC to company email
 
