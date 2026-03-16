@@ -249,7 +249,7 @@ www.ToomeyIrrigation.com{prepared_by_line}""".strip()
 
     if extra_cc and extra_cc != to_email and extra_cc != from_email:
         message.cc = Cc(extra_cc)
-    if bcc_email and bcc_email != from_email:
+    if bcc_email and bcc_email != from_email and bcc_email != to_email and bcc_email != extra_cc:
         message.bcc = Bcc(bcc_email)
 
     # Attach PDF
