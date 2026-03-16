@@ -265,9 +265,15 @@ www.ToomeyIrrigation.com{prepared_by_line}""".strip()
     )
 
     sg = sendgrid.SendGridAPIClient(api_key)
-    response = sg.send(message)
-    if response.status_code not in [200, 202]:
-        raise Exception(f"SendGrid error {response.status_code}: {response.body}")
+    try:
+        response = sg.send(message)
+        if response.status_code not in [200, 202]:
+            raise Exception(f"SendGrid error {response.status_code}: {response.body}")
+    except Exception as e:
+        # Capture detailed SendGrid error body if available
+        if hasattr(e, 'body'):
+            raise Exception(f"SendGrid {getattr(e, 'status_code', 'error')}: {e.body}")
+        raise
 
 
 @app.route('/send-job-pdf', methods=['POST'])
