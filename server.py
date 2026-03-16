@@ -8,10 +8,11 @@ import json
 import os
 import subprocess
 from datetime import datetime
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.application import MIMEApplication
+import base64 as b64lib_smtp
+import sendgrid
+from sendgrid.helpers.mail import (
+    Mail, Attachment, FileContent, FileName, FileType, Disposition, Cc, Bcc
+)
 
 import requests as req_lib
 
@@ -213,36 +214,20 @@ def sync_to_sheets():
 
 
 def send_email_with_pdf(to_email, customer_name, pdf_path, custom_message="", user_email="", user_name="", user_smtp_password="", subject_override=None, extra_cc=None, attachment_name=None, accept_url=None):
-    """
-    Send PDF via email using SMTP.
-    If user credentials are provided, use those. Otherwise fall back to environment variables.
-    """
-    smtp_user = user_email if user_email else os.environ.get('SMTP_USER')
-    smtp_password = user_smtp_password if user_smtp_password else os.environ.get('SMTP_PASSWORD')
-    from_email = user_email if user_email else os.environ.get('FROM_EMAIL', smtp_user)
+    """Send PDF via email using SendGrid API."""
+    api_key = os.environ.get('SENDGRID_API_KEY')
+    if not api_key:
+        raise Exception("SENDGRID_API_KEY not configured in Railway environment variables.")
 
-    smtp_host = os.environ.get('SMTP_HOST', 'smtp.office365.com')
-    smtp_port = int(os.environ.get('SMTP_PORT', 587))
-    bcc_email = os.environ.get('BCC_EMAIL')  # Optional BCC to company email
+    from_email = user_email if user_email else os.environ.get('FROM_EMAIL', 'info@toomeyirrigation.com')
+    from_name  = user_name  if user_name  else 'W.L. Toomey Irrigation'
+    bcc_email  = os.environ.get('BCC_EMAIL')
 
-    if not smtp_user or not smtp_password:
-        raise Exception("Email credentials not configured. Set SMTP_USER and SMTP_PASSWORD environment variables or provide user credentials.")
-
-    # Create message
-    msg = MIMEMultipart()
-    msg['From'] = f"{user_name} <{from_email}>" if user_name else from_email
-    msg['To'] = to_email
-    msg['Subject'] = subject_override if subject_override else f"W.L. Toomey Irrigation - Proposal for {customer_name}"
-
-    if bcc_email and bcc_email != from_email:
-        msg['Bcc'] = bcc_email
-
-    if extra_cc and extra_cc != from_email and extra_cc != to_email:
-        msg['Cc'] = extra_cc
+    subject = subject_override if subject_override else f"W.L. Toomey Irrigation - Proposal for {customer_name}"
 
     prepared_by_line = f"\n\nPrepared by: {user_name}\n{user_email}" if user_name else ""
-    custom_block = f"\n{custom_message}\n" if custom_message.strip() else ""
-    accept_block = f"\n\nTo accept this proposal, click here:\n{accept_url}\n" if accept_url else ""
+    custom_block     = f"\n{custom_message}\n" if custom_message.strip() else ""
+    accept_block     = f"\n\nTo accept this proposal, click here:\n{accept_url}\n" if accept_url else ""
 
     body = f"""Hi {customer_name},
 
@@ -255,25 +240,34 @@ W.L. Toomey Irrigation
 (781) 937-0552
 www.ToomeyIrrigation.com{prepared_by_line}""".strip()
 
-    msg.attach(MIMEText(body, 'plain'))
+    message = Mail(
+        from_email=(from_email, from_name),
+        to_emails=to_email,
+        subject=subject,
+        plain_text_content=body
+    )
+
+    if extra_cc and extra_cc != to_email and extra_cc != from_email:
+        message.cc = Cc(extra_cc)
+    if bcc_email and bcc_email != from_email:
+        message.bcc = Bcc(bcc_email)
 
     # Attach PDF
     attach_filename = attachment_name or f'Toomey_Irrigation_Proposal_{customer_name.replace(" ", "_")}.pdf'
     with open(pdf_path, 'rb') as f:
-        pdf_attachment = MIMEApplication(f.read(), _subtype='pdf')
-        pdf_attachment.add_header('Content-Disposition', 'attachment', filename=attach_filename)
-        msg.attach(pdf_attachment)
+        pdf_b64 = b64lib_smtp.b64encode(f.read()).decode()
 
-    # Send email (10s timeout so Railway doesn't hang and 502)
-    with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
-        server.starttls()
-        server.login(smtp_user, smtp_password)
-        recipients = [to_email]
-        if bcc_email and bcc_email != from_email:
-            recipients.append(bcc_email)
-        if extra_cc and extra_cc not in recipients:
-            recipients.append(extra_cc)
-        server.sendmail(from_email, recipients, msg.as_string())
+    message.attachment = Attachment(
+        FileContent(pdf_b64),
+        FileName(attach_filename),
+        FileType('application/pdf'),
+        Disposition('attachment')
+    )
+
+    sg = sendgrid.SendGridAPIClient(api_key)
+    response = sg.send(message)
+    if response.status_code not in [200, 202]:
+        raise Exception(f"SendGrid error {response.status_code}: {response.body}")
 
 
 @app.route('/send-job-pdf', methods=['POST'])
