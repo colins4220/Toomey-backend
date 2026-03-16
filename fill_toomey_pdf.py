@@ -46,7 +46,8 @@ def fill_pdf(data: dict, input_pdf: str, output_pdf: str):
             # Convert from top-based to bottom-based (reportlab uses bottom-origin)
             y = PAGE_H - field['y']
             font_size = field.get('font_size', 11)
-            c.setFont("Helvetica", font_size)
+            bold = field.get('bold', False)
+            c.setFont("Helvetica-Bold" if bold else "Helvetica", font_size)
             c.drawString(x, y, str(text))
         
         c.save()
@@ -72,18 +73,15 @@ def fill_pdf(data: dict, input_pdf: str, output_pdf: str):
     
     page1_fields = []
     
-    # "Prepared For" - customer name after label (top=638.3, y from bottom = 792-638.3 = 153.7)
-    # Place customer name below the "PREPARED FOR:" label
+    # "Prepared For" - customer name and address below the "PREPARED FOR:" label
     if customer_name:
-        page1_fields.append({'text': customer_name, 'x': 328.5, 'y': 656, 'font_size': 11})
+        page1_fields.append({'text': customer_name, 'x': 328.5, 'y': 672, 'font_size': 11, 'bold': True})
     if customer_address:
-        page1_fields.append({'text': customer_address, 'x': 328.5, 'y': 670, 'font_size': 10})
-    if customer_email:
-        page1_fields.append({'text': customer_email, 'x': 328.5, 'y': 684, 'font_size': 10})
-    
-    # "DATE:" label at top=746.3, x0=328.5 → place date after it
+        page1_fields.append({'text': customer_address, 'x': 328.5, 'y': 688, 'font_size': 10})
+
+    # "DATE:" label at top=746.3 → place date to the right of it, bold
     if proposal_date:
-        page1_fields.append({'text': proposal_date, 'x': 378, 'y': 748, 'font_size': 11})
+        page1_fields.append({'text': proposal_date, 'x': 378, 'y': 748, 'font_size': 11, 'bold': True})
     
     # ---- PAGE 3 FIELDS (Estimate page) ----
     # From structure:
@@ -129,29 +127,29 @@ def fill_pdf(data: dict, input_pdf: str, output_pdf: str):
     
     page3_fields = []
     
-    # Head counts - position after their labels
-    if pgp_ultra:
-        page3_fields.append({'text': str(pgp_ultra), 'x': 173, 'y': 200, 'font_size': 11})
-    if mp_rotor:
-        page3_fields.append({'text': str(mp_rotor), 'x': 173, 'y': 227, 'font_size': 11})
-    if pro4_spray:
-        page3_fields.append({'text': str(pro4_spray), 'x': 173, 'y': 253, 'font_size': 11})
+    # Head counts - only show non-zero values, aligned to label baselines
+    if pgp_ultra and pgp_ultra != '0':
+        page3_fields.append({'text': str(pgp_ultra), 'x': 173, 'y': 199, 'font_size': 11})
+    if mp_rotor and mp_rotor != '0':
+        page3_fields.append({'text': str(mp_rotor), 'x': 173, 'y': 225, 'font_size': 11})
+    if pro4_spray and pro4_spray != '0':
+        page3_fields.append({'text': str(pro4_spray), 'x': 173, 'y': 252, 'font_size': 11})
     if total_heads > 0:
-        page3_fields.append({'text': str(total_heads), 'x': 173, 'y': 284, 'font_size': 11})
-    
-    # Right side fields
-    if drip_zones:
-        page3_fields.append({'text': str(drip_zones), 'x': 420, 'y': 200, 'font_size': 11})
-    if num_zones:
-        page3_fields.append({'text': str(num_zones), 'x': 420, 'y': 227, 'font_size': 11})
-    if irritrol_valves:
-        page3_fields.append({'text': str(irritrol_valves), 'x': 420, 'y': 253, 'font_size': 11})
+        page3_fields.append({'text': str(total_heads), 'x': 173, 'y': 282, 'font_size': 11, 'bold': True})
+
+    # Right side fields - only show non-zero values
+    if drip_zones and drip_zones != '0':
+        page3_fields.append({'text': str(drip_zones), 'x': 420, 'y': 199, 'font_size': 11})
+    if num_zones and num_zones != '0':
+        page3_fields.append({'text': str(num_zones), 'x': 420, 'y': 225, 'font_size': 11})
+    if irritrol_valves and irritrol_valves != '0':
+        page3_fields.append({'text': str(irritrol_valves), 'x': 420, 'y': 252, 'font_size': 11})
     if hydrawise_timer:
-        page3_fields.append({'text': str(hydrawise_timer), 'x': 420, 'y': 284, 'font_size': 11})
-    
-    # Price - after "Price: $"
+        page3_fields.append({'text': str(hydrawise_timer), 'x': 420, 'y': 282, 'font_size': 11})
+
+    # Price - larger, bold, on the line
     if price:
-        page3_fields.append({'text': str(price), 'x': 298, 'y': 329, 'font_size': 12})
+        page3_fields.append({'text': '$' + str(price), 'x': 260, 'y': 332, 'font_size': 18, 'bold': True})
     
     # Notes - can be multi-line, placed on note lines
     if notes:
