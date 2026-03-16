@@ -145,11 +145,11 @@ def fill_pdf(data: dict, input_pdf: str, output_pdf: str):
     if irritrol_valves and irritrol_valves != '0':
         page3_fields.append({'text': str(irritrol_valves), 'x': 438, 'y': 260, 'font_size': 11})
     if hydrawise_timer:
-        page3_fields.append({'text': str(hydrawise_timer), 'x': 438, 'y': 290, 'font_size': 11})
+        page3_fields.append({'text': str(hydrawise_timer), 'x': 415, 'y': 290, 'font_size': 11})
 
     # Price - larger, bold, on the line
     if price:
-        page3_fields.append({'text': str(price), 'x': 320, 'y': 350, 'font_size': 18, 'bold': True})
+        page3_fields.append({'text': str(price), 'x': 320, 'y': 342, 'font_size': 18, 'bold': True})
     
     # Notes - can be multi-line, placed on note lines
     if notes:
