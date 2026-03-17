@@ -226,26 +226,51 @@ def send_email_with_pdf(to_email, customer_name, pdf_path, custom_message="", us
 
     subject = subject_override if subject_override else f"W.L. Toomey Irrigation - Proposal for {customer_name}"
 
-    prepared_by_line = f"\n\nPrepared by: {user_name}\n{user_email}" if user_name else ""
-    custom_block     = f"\n{custom_message}\n" if custom_message.strip() else ""
-    accept_block     = f"\n\nTo accept this proposal, click here:\n{accept_url}\n" if accept_url else ""
+    prepared_by_line_txt  = f"\n\nPrepared by: {user_name}\n{user_email}" if user_name else ""
+    prepared_by_line_html = f"<br><br>Prepared by: {user_name}<br>{user_email}" if user_name else ""
+    custom_block_txt  = f"\n{custom_message}\n" if custom_message.strip() else ""
+    custom_block_html = f"<br>{custom_message}<br>" if custom_message.strip() else ""
 
-    body = f"""Hi {customer_name},
+    # Plain text fallback
+    accept_block_txt = f"\n\nTo accept this proposal, click here:\n{accept_url}\n" if accept_url else ""
+    plain_body = f"""Hi {customer_name},
 
 Please find your W.L. Toomey Irrigation proposal attached.
-{custom_block}{accept_block}
+{custom_block_txt}{accept_block_txt}
 If you have any questions, please don't hesitate to reach out.
 
 Best regards,
 W.L. Toomey Irrigation
 (781) 937-0552
-www.ToomeyIrrigation.com{prepared_by_line}""".strip()
+www.ToomeyIrrigation.com{prepared_by_line_txt}""".strip()
+
+    # HTML email
+    accept_block_html = f"""
+<br><br>
+<a href="{accept_url}" style="display:inline-block;padding:14px 28px;background:#1a3a6b;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:bold;font-size:15px;">
+  Click Here to Accept Proposal
+</a>
+<br>""" if accept_url else ""
+
+    html_body = f"""<div style="font-family:Arial,sans-serif;font-size:15px;color:#222;max-width:560px;">
+<p>Hi {customer_name},</p>
+<p>Please find your W.L. Toomey Irrigation proposal attached.{custom_block_html}</p>
+{accept_block_html}
+<p>If you have any questions, please don't hesitate to reach out.</p>
+<p>Best regards,<br>
+<strong>W.L. Toomey Irrigation</strong><br>
+(781) 937-0552<br>
+<a href="https://www.ToomeyIrrigation.com">www.ToomeyIrrigation.com</a>
+{prepared_by_line_html}
+</p>
+</div>"""
 
     message = Mail(
         from_email=(from_email, from_name),
         to_emails=to_email,
         subject=subject,
-        plain_text_content=body
+        plain_text_content=plain_body,
+        html_content=html_body
     )
 
     if extra_cc and extra_cc != to_email and extra_cc != from_email:
