@@ -176,10 +176,11 @@ def send_pdf(pdf_id):
         if not customer_email:
             return jsonify({"error": "No customer email provided"}), 400
         
-        # Get optional custom message from request
+        # Get optional fields from request
         custom_message = request.json.get("message", "")
-        
-        # Send email with user credentials if provided
+        accept_url     = request.json.get("accept_url", "")
+
+        # Send email via SendGrid
         send_email_with_pdf(
             to_email=customer_email,
             customer_name=customer_name,
@@ -187,7 +188,7 @@ def send_pdf(pdf_id):
             custom_message=custom_message,
             user_email=prepared_by_email,
             user_name=prepared_by_name,
-            user_smtp_password=smtp_password
+            accept_url=accept_url
         )
         
         return jsonify({
