@@ -11,7 +11,7 @@ from datetime import datetime
 import base64 as b64lib_smtp
 import sendgrid
 from sendgrid.helpers.mail import (
-    Mail, Attachment, FileContent, FileName, FileType, Disposition, Cc, Bcc
+    Mail, Attachment, FileContent, FileName, FileType, Disposition, Cc, Bcc, ReplyTo
 )
 
 import requests as req_lib
@@ -88,6 +88,7 @@ def generate_pdf():
             "prepared_by_name": data.get("prepared_by_name", ""),
             "prepared_by_email": data.get("prepared_by_email", ""),
             "smtp_password": data.get("smtp_password", ""),
+            "firebase_id": data.get("firebaseId", ""),
             "created_at": datetime.now().isoformat()
         }
         
@@ -179,6 +180,7 @@ def send_pdf(pdf_id):
         # Get optional fields from request
         custom_message = request.json.get("message", "")
         accept_url     = request.json.get("accept_url", "")
+        firebase_id    = metadata.get("firebase_id", "")
 
         # Send email via SendGrid
         send_email_with_pdf(
@@ -190,10 +192,15 @@ def send_pdf(pdf_id):
             user_name=prepared_by_name,
             accept_url=accept_url
         )
-        
+
+        # Save to Google Drive
+        filename = f'Toomey_New_Install_{customer_name.replace(" ", "_")}.pdf'
+        drive_url = save_pdf_to_drive(pdf_path, 'new_installation', firebase_id, filename)
+
         return jsonify({
             "success": True,
-            "message": f"PDF sent to {customer_email}"
+            "message": f"PDF sent to {customer_email}",
+            "driveUrl": drive_url
         })
         
     except Exception as e:
@@ -214,6 +221,28 @@ def sync_to_sheets():
         return jsonify({"error": str(e)}), 500
 
 
+APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxzNihd63pA6DrwLyOzIDh4mWBba_hOLOjROwk54ZlFN_0CN0Rbm9wGUciMV-4KlVd5oQ/exec"
+
+def save_pdf_to_drive(pdf_path, job_type, firebase_id, filename):
+    """Save PDF to Google Drive via Apps Script doPost. Returns Drive URL or ''."""
+    try:
+        import base64 as b64drive
+        with open(pdf_path, 'rb') as f:
+            pdf_b64 = b64drive.b64encode(f.read()).decode()
+        resp = req_lib.post(APPS_SCRIPT_URL, json={
+            'action':     'save_pdf',
+            'jobType':    job_type,
+            'firebaseId': firebase_id,
+            'filename':   filename,
+            'pdf_base64': pdf_b64
+        }, timeout=30)
+        result = resp.json()
+        return result.get('driveUrl', '')
+    except Exception as e:
+        print(f'Drive save failed (non-fatal): {e}')
+        return ''
+
+
 def send_email_with_pdf(to_email, customer_name, pdf_path, custom_message="", user_email="", user_name="", user_smtp_password="", subject_override=None, extra_cc=None, attachment_name=None, accept_url=None):
     """Send PDF via email using SendGrid API."""
     api_key = os.environ.get('SENDGRID_API_KEY')
@@ -231,32 +260,21 @@ def send_email_with_pdf(to_email, customer_name, pdf_path, custom_message="", us
     custom_block_txt  = f"\n{custom_message}\n" if custom_message.strip() else ""
     custom_block_html = f"<br>{custom_message}<br>" if custom_message.strip() else ""
 
-    # Plain text fallback
-    accept_block_txt = f"\n\nTo accept this proposal, click here:\n{accept_url}\n" if accept_url else ""
     plain_body = f"""Hi {customer_name},
 
 Please find your W.L. Toomey Irrigation proposal attached.
-{custom_block_txt}{accept_block_txt}
-If you have any questions, please don't hesitate to reach out.
+{custom_block_txt}
+TO ACCEPT THIS PROPOSAL, OR IF YOU HAVE ANY ADDITIONAL QUESTIONS, PLEASE REPLY DIRECTLY TO THIS EMAIL.
 
 Best regards,
 W.L. Toomey Irrigation
 (781) 937-0552
 www.ToomeyIrrigation.com{prepared_by_line_txt}""".strip()
 
-    # HTML email
-    accept_block_html = f"""
-<br><br>
-<a href="{accept_url}" style="display:inline-block;padding:14px 28px;background:#1a3a6b;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:bold;font-size:15px;">
-  Click Here to Accept Proposal
-</a>
-<br>""" if accept_url else ""
-
     html_body = f"""<div style="font-family:Arial,sans-serif;font-size:15px;color:#222;max-width:560px;">
 <p>Hi {customer_name},</p>
 <p>Please find your W.L. Toomey Irrigation proposal attached.{custom_block_html}</p>
-{accept_block_html}
-<p>If you have any questions, please don't hesitate to reach out.</p>
+<p><strong>To accept this proposal, or if you have any additional questions, please reply directly to this email.</strong></p>
 <p>Best regards,<br>
 <strong>W.L. Toomey Irrigation</strong><br>
 (781) 937-0552<br>
@@ -272,6 +290,17 @@ www.ToomeyIrrigation.com{prepared_by_line_txt}""".strip()
         plain_text_content=plain_body,
         html_content=html_body
     )
+
+    # Reply-to: both the estimator and the office so customer replies reach both
+    office_email_addr = 'info@toomeyirrigation.com'
+    reply_to_list = []
+    if user_email and user_email != office_email_addr:
+        reply_to_list.append(ReplyTo(user_email, user_name or 'W.L. Toomey Irrigation'))
+    reply_to_list.append(ReplyTo(office_email_addr, 'W.L. Toomey Irrigation'))
+    if len(reply_to_list) == 1:
+        message.reply_to = reply_to_list[0]
+    else:
+        message.reply_to_list = reply_to_list
 
     if extra_cc and extra_cc != to_email and extra_cc != from_email:
         message.cc = Cc(extra_cc)
@@ -315,7 +344,9 @@ def send_job_pdf():
         filename        = data.get('filename', 'Toomey_Proposal.pdf')
         to_email        = data.get('to_email', '')
         customer_name   = data.get('customer_name', 'Customer')
+        job_type        = data.get('job_type', '')
         job_type_label  = data.get('job_type_label', 'Proposal')
+        firebase_id     = data.get('firebase_id', '')
         prepared_by_name  = data.get('prepared_by_name', '')
         prepared_by_email = data.get('prepared_by_email', '')
         smtp_password   = data.get('smtp_password', '')
@@ -352,13 +383,16 @@ def send_job_pdf():
             accept_url=accept_url
         )
 
+        # Save to Google Drive
+        drive_url = save_pdf_to_drive(pdf_path, job_type, firebase_id, filename)
+
         # Clean up temp file
         try:
             os.remove(pdf_path)
         except Exception:
             pass
 
-        return jsonify({"success": True, "message": f"PDF sent to {to_email}"})
+        return jsonify({"success": True, "message": f"PDF sent to {to_email}", "driveUrl": drive_url})
 
     except Exception as e:
         import traceback

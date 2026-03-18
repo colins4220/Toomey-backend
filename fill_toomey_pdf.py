@@ -65,20 +65,12 @@ def fill_pdf(data: dict, input_pdf: str, output_pdf: str):
 
     customer_name    = data.get('customer_name', '')
     customer_address = data.get('customer_address', '')
+    customer_town    = data.get('customer_town', '')
     proposal_date    = data.get('date', '')
 
-    # Split address into street + city/state
-    addr_parts = [p.strip() for p in customer_address.split(',')]
-    if len(addr_parts) >= 2:
-        street = addr_parts[0]
-        city_raw = ', '.join(addr_parts[1:]).strip()
-        # Ensure MA is present
-        if 'MA' not in city_raw and 'Massachusetts' not in city_raw:
-            city_raw = city_raw + ', MA'
-        city_state = city_raw
-    else:
-        street = customer_address
-        city_state = 'MA'
+    # Street is whatever is in address field; town comes from separate field
+    street     = customer_address.strip()
+    city_state = (customer_town.strip() + ', MA') if customer_town.strip() else 'MA'
 
     # Format price with comma: 1234 -> 1,234
     price_raw = data.get('price', '')
@@ -151,7 +143,7 @@ def fill_pdf(data: dict, input_pdf: str, output_pdf: str):
     # Notes — white rect to cover printed lines, then word-wrapped text
     if notes:
         # Cover the printed note lines with a white rectangle
-        page3_fields.append({'type': 'rect', 'x': 10, 'y': 398, 'width': 592, 'height': 145, 'color': (1, 1, 1)})
+        page3_fields.append({'type': 'rect', 'x': 10, 'y': 398, 'width': 592, 'height': 128, 'color': (1, 1, 1)})
 
         note_font  = 'Helvetica'
         note_size  = 10
