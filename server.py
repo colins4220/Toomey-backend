@@ -243,7 +243,7 @@ def save_pdf_to_drive(pdf_path, job_type, firebase_id, filename):
         return ''
 
 
-def send_email_with_pdf(to_email, customer_name, pdf_path, custom_message="", user_email="", user_name="", user_smtp_password="", subject_override=None, extra_cc=None, attachment_name=None, accept_url=None):
+def send_email_with_pdf(to_email, customer_name, pdf_path, custom_message="", user_email="", user_name="", user_smtp_password="", subject_override=None, extra_cc=None, attachment_name=None, accept_url=None, job_type=""):
     """Send PDF via email using SendGrid API."""
     api_key = os.environ.get('SENDGRID_API_KEY')
     if not api_key:
@@ -295,6 +295,37 @@ www.ToomeyIrrigation.com{prepared_by_line_txt}""".strip()
 </ul>
 <p>We take pride in every system we install and look forward to the opportunity to work with you. Our team is happy to answer any questions along the way.</p>
 <p><strong>To accept this proposal or if you have any questions, please reply directly to this email.</strong></p>
+<p>Best regards,<br>
+<strong>W.L. Toomey Irrigation</strong><br>
+(781) 937-0552<br>
+<a href="https://www.ToomeyIrrigation.com">www.ToomeyIrrigation.com</a><br>
+{prepared_by_line_html}
+</p>
+</div>"""
+
+    elif job_type == 'system_recommendations':
+        plain_body = f"""Hi {customer_name},
+
+During our recent visit to your property, our technician noticed a few things with your irrigation system worth bringing to your attention.
+
+We've put together a quick proposal outlining our recommendations — these may be improvements, upgrades, or repairs that could help your system run more efficiently or prevent problems down the road. We wanted to make sure you had the information so you can decide what makes sense for you.
+{custom_block_txt}
+Please find the attached proposal for your review. There's no obligation — if you'd like to move forward with any of the recommendations, or if you have any questions, just reply to this email and we'll take it from there.
+
+Thank you for your continued trust in W.L. Toomey Irrigation.
+
+Best regards,
+W.L. Toomey Irrigation
+(781) 937-0552
+www.ToomeyIrrigation.com{prepared_by_line_txt}""".strip()
+
+        html_body = f"""<div style="font-family:Arial,sans-serif;font-size:15px;color:#222;max-width:560px;">
+<p>Hi {customer_name},</p>
+<p>During our recent visit to your property, our technician noticed a few things with your irrigation system worth bringing to your attention.</p>
+<p>We've put together a quick proposal outlining our recommendations — these may be improvements, upgrades, or repairs that could help your system run more efficiently or prevent problems down the road. We wanted to make sure you had the information so you can decide what makes sense for you.</p>
+{custom_block_html}
+<p>Please find the attached proposal for your review. There's no obligation — if you'd like to move forward with any of the recommendations, or if you have any questions, just reply to this email and we'll take it from there.</p>
+<p>Thank you for your continued trust in W.L. Toomey Irrigation.</p>
 <p>Best regards,<br>
 <strong>W.L. Toomey Irrigation</strong><br>
 (781) 937-0552<br>
@@ -425,7 +456,8 @@ def send_job_pdf():
             subject_override=subject,
             extra_cc=office_email,
             attachment_name=filename,
-            accept_url=accept_url
+            accept_url=accept_url,
+            job_type=job_type
         )
 
         # Save to Google Drive
