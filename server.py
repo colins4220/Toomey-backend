@@ -255,30 +255,75 @@ def send_email_with_pdf(to_email, customer_name, pdf_path, custom_message="", us
 
     subject = subject_override if subject_override else f"W.L. Toomey Irrigation - Proposal for {customer_name}"
 
-    prepared_by_line_txt  = f"\n\nPrepared by: {user_name}\n{user_email}" if user_name else ""
-    prepared_by_line_html = f"<br><br>Prepared by: {user_name}<br>{user_email}" if user_name else ""
+    prepared_by_line_txt  = f"\nPrepared by: {user_name} | {user_email}" if user_name else ""
+    prepared_by_line_html = f"<br><em>Prepared by: {user_name} | {user_email}</em>" if user_name else ""
     custom_block_txt  = f"\n{custom_message}\n" if custom_message.strip() else ""
-    custom_block_html = f"<br>{custom_message}<br>" if custom_message.strip() else ""
+    custom_block_html = f"<p>{custom_message}</p>" if custom_message.strip() else ""
 
-    plain_body = f"""Hi {customer_name},
+    # New install proposals get a fuller email body; other job types (subject_override set) get a shorter one
+    if not subject_override:
+        plain_body = f"""Hi {customer_name},
 
-Please find your W.L. Toomey Irrigation proposal attached.
+Thank you for the opportunity to provide a proposal for your irrigation system — we appreciate your interest in W.L. Toomey Irrigation!
+
+Please find your personalized proposal attached. It includes a full overview of the recommended system design for your property.
 {custom_block_txt}
-TO ACCEPT THIS PROPOSAL, OR IF YOU HAVE ANY ADDITIONAL QUESTIONS, PLEASE REPLY DIRECTLY TO THIS EMAIL.
+Here's what to expect next:
+  - Review the attached proposal at your convenience
+  - If you have any questions or would like to make any adjustments, don't hesitate to reach out
+  - When you're ready to move forward, simply reply to this email and we'll get your installation scheduled
+
+We take pride in every system we install and look forward to the opportunity to work with you. Our team is happy to answer any questions along the way.
+
+TO ACCEPT THIS PROPOSAL OR IF YOU HAVE ANY QUESTIONS, PLEASE REPLY DIRECTLY TO THIS EMAIL.
 
 Best regards,
 W.L. Toomey Irrigation
 (781) 937-0552
 www.ToomeyIrrigation.com{prepared_by_line_txt}""".strip()
 
-    html_body = f"""<div style="font-family:Arial,sans-serif;font-size:15px;color:#222;max-width:560px;">
+        html_body = f"""<div style="font-family:Arial,sans-serif;font-size:15px;color:#222;max-width:560px;">
 <p>Hi {customer_name},</p>
-<p>Please find your W.L. Toomey Irrigation proposal attached.{custom_block_html}</p>
-<p><strong>To accept this proposal, or if you have any additional questions, please reply directly to this email.</strong></p>
+<p>Thank you for the opportunity to provide a proposal for your irrigation system — we appreciate your interest in W.L. Toomey Irrigation!</p>
+<p>Please find your personalized proposal attached. It includes a full overview of the recommended system design for your property.</p>
+{custom_block_html}
+<p><strong>Here's what to expect next:</strong></p>
+<ul style="margin:0 0 16px 0;padding-left:20px;line-height:1.8;">
+  <li>Review the attached proposal at your convenience</li>
+  <li>If you have any questions or would like to make any adjustments, don't hesitate to reach out</li>
+  <li>When you're ready to move forward, simply reply to this email and we'll get your installation scheduled</li>
+</ul>
+<p>We take pride in every system we install and look forward to the opportunity to work with you. Our team is happy to answer any questions along the way.</p>
+<p><strong>To accept this proposal or if you have any questions, please reply directly to this email.</strong></p>
 <p>Best regards,<br>
 <strong>W.L. Toomey Irrigation</strong><br>
 (781) 937-0552<br>
-<a href="https://www.ToomeyIrrigation.com">www.ToomeyIrrigation.com</a>
+<a href="https://www.ToomeyIrrigation.com">www.ToomeyIrrigation.com</a><br>
+{prepared_by_line_html}
+</p>
+</div>"""
+
+    else:
+        plain_body = f"""Hi {customer_name},
+
+Please find your W.L. Toomey Irrigation proposal attached.
+{custom_block_txt}
+TO ACCEPT THIS PROPOSAL OR IF YOU HAVE ANY ADDITIONAL QUESTIONS, PLEASE REPLY DIRECTLY TO THIS EMAIL.
+
+Best regards,
+W.L. Toomey Irrigation
+(781) 937-0552
+www.ToomeyIrrigation.com{prepared_by_line_txt}""".strip()
+
+        html_body = f"""<div style="font-family:Arial,sans-serif;font-size:15px;color:#222;max-width:560px;">
+<p>Hi {customer_name},</p>
+<p>Please find your W.L. Toomey Irrigation proposal attached.</p>
+{custom_block_html}
+<p><strong>To accept this proposal or if you have any additional questions, please reply directly to this email.</strong></p>
+<p>Best regards,<br>
+<strong>W.L. Toomey Irrigation</strong><br>
+(781) 937-0552<br>
+<a href="https://www.ToomeyIrrigation.com">www.ToomeyIrrigation.com</a><br>
 {prepared_by_line_html}
 </p>
 </div>"""
