@@ -84,27 +84,35 @@ def generate_pdf():
         with open(pdf_path, 'rb') as f:
             pdf_base64_resp = b64resp.b64encode(f.read()).decode()
 
+        # Save to Google Drive immediately at generate time — this ensures every
+        # New Install proposal has a Drive copy even if the email is never sent
+        customer_name = data.get("customer_name", "Unknown")
+        firebase_id   = data.get("firebaseId", pdf_id)
+        drive_filename = f'Toomey_New_Install_{customer_name.replace(" ", "_")}.pdf'
+        drive_url = save_pdf_to_drive(pdf_path, 'new_installation', firebase_id, drive_filename)
+
         # Store metadata for later sending
         metadata = {
             "pdf_id": pdf_id,
             "pdf_path": pdf_path,
-            "customer_name": data.get("customer_name"),
+            "customer_name": customer_name,
             "customer_email": data.get("customer_email"),
             "prepared_by_name": data.get("prepared_by_name", ""),
             "prepared_by_email": data.get("prepared_by_email", ""),
             "smtp_password": data.get("smtp_password", ""),
-            "firebase_id": data.get("firebaseId", ""),
+            "firebase_id": firebase_id,
             "created_at": datetime.now().isoformat()
         }
-        
+
         metadata_path = os.path.join(PDF_DIR, f"{pdf_id}_meta.json")
         with open(metadata_path, 'w') as f:
             json.dump(metadata, f)
-        
+
         return jsonify({
             "success": True,
             "pdf_id": pdf_id,
             "pdf_base64": pdf_base64_resp,
+            "drive_url": drive_url,
             "download_url": f"/download-pdf/{pdf_id}",
             "preview_url": f"/preview-pdf/{pdf_id}",
             "customer_name": data.get("customer_name"),
