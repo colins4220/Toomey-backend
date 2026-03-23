@@ -456,8 +456,11 @@ def send_job_pdf():
         with open(pdf_path, 'wb') as f:
             f.write(pdf_bytes)
 
-        subject = f"W.L. Toomey Irrigation - {job_type_label} for {customer_name}"
         office_email = "info@toomeyirrigation.com" if cc_office else None
+
+        # New Install gets the full "Thank you for the opportunity..." email body.
+        # Other job types get a subject override which triggers the shorter body.
+        subject_override = None if job_type == 'new_installation' else f"W.L. Toomey Irrigation - {job_type_label} for {customer_name}"
 
         send_email_with_pdf(
             to_email=to_email,
@@ -467,7 +470,7 @@ def send_job_pdf():
             user_email=prepared_by_email,
             user_name=prepared_by_name,
             user_smtp_password=smtp_password,
-            subject_override=subject,
+            subject_override=subject_override,
             extra_cc=office_email,
             attachment_name=filename,
             accept_url=accept_url,
