@@ -78,7 +78,12 @@ def generate_pdf():
             return jsonify({"error": "PDF file was not created"}), 500
         
         print(f"PDF successfully created at: {pdf_path}")
-        
+
+        # Read PDF as base64 so frontend can upload to Firebase Storage
+        import base64 as b64resp
+        with open(pdf_path, 'rb') as f:
+            pdf_base64_resp = b64resp.b64encode(f.read()).decode()
+
         # Store metadata for later sending
         metadata = {
             "pdf_id": pdf_id,
@@ -99,6 +104,7 @@ def generate_pdf():
         return jsonify({
             "success": True,
             "pdf_id": pdf_id,
+            "pdf_base64": pdf_base64_resp,
             "download_url": f"/download-pdf/{pdf_id}",
             "preview_url": f"/preview-pdf/{pdf_id}",
             "customer_name": data.get("customer_name"),
