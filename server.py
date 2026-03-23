@@ -15,8 +15,25 @@ from sendgrid.helpers.mail import (
 )
 
 import requests as req_lib
+import re
 
 app = Flask(__name__)
+
+def make_filename(customer_name, address, job_type):
+    """Generate filename: LASTNAME_STREETADDRESS_TYPE.pdf"""
+    parts = (customer_name or '').strip().split()
+    last_name = re.sub(r'[^a-zA-Z0-9]', '', parts[-1]) if parts else 'Unknown'
+    street = (address or '').split(',')[0].strip()
+    street_clean = re.sub(r'[^a-zA-Z0-9\s]', '', street).strip()
+    street_clean = re.sub(r'\s+', '_', street_clean)
+    type_labels = {
+        'new_installation':      'New_Install',
+        'revamp':                'Revamp',
+        'service_call':          'Service_Call',
+        'system_recommendations':'System_Recs',
+    }
+    type_label = type_labels.get(job_type, job_type.replace('_', ' ').title().replace(' ', '_'))
+    return f"{last_name}_{street_clean}_{type_label}.pdf"
 CORS(app)  # Allow requests from iPad
 
 # Directory for temporary PDFs
@@ -86,9 +103,10 @@ def generate_pdf():
 
         # Save to Google Drive immediately at generate time — this ensures every
         # New Install proposal has a Drive copy even if the email is never sent
-        customer_name = data.get("customer_name", "Unknown")
-        firebase_id   = data.get("firebaseId", pdf_id)
-        drive_filename = f'Toomey_New_Install_{customer_name.replace(" ", "_")}.pdf'
+        customer_name    = data.get("customer_name", "Unknown")
+        customer_address = data.get("customer_address", "")
+        firebase_id      = data.get("firebaseId", pdf_id)
+        drive_filename   = make_filename(customer_name, customer_address, 'new_installation')
         drive_url = save_pdf_to_drive(pdf_path, 'new_installation', firebase_id, drive_filename)
 
         # Store metadata for later sending
@@ -96,6 +114,7 @@ def generate_pdf():
             "pdf_id": pdf_id,
             "pdf_path": pdf_path,
             "customer_name": customer_name,
+            "customer_address": customer_address,
             "customer_email": data.get("customer_email"),
             "prepared_by_name": data.get("prepared_by_name", ""),
             "prepared_by_email": data.get("prepared_by_email", ""),
@@ -182,8 +201,9 @@ def send_pdf(pdf_id):
         with open(metadata_path, 'r') as f:
             metadata = json.load(f)
         
-        customer_email = metadata.get("customer_email")
-        customer_name = metadata.get("customer_name")
+        customer_email   = metadata.get("customer_email")
+        customer_name    = metadata.get("customer_name")
+        customer_address = metadata.get("customer_address", "")
         prepared_by_name = metadata.get("prepared_by_name", "")
         prepared_by_email = metadata.get("prepared_by_email", "")
         smtp_password = metadata.get("smtp_password", "")
@@ -208,7 +228,7 @@ def send_pdf(pdf_id):
         )
 
         # Save to Google Drive
-        filename = f'Toomey_New_Install_{customer_name.replace(" ", "_")}.pdf'
+        filename  = make_filename(customer_name, customer_address, 'new_installation')
         drive_url = save_pdf_to_drive(pdf_path, 'new_installation', firebase_id, filename)
 
         return jsonify({
@@ -430,15 +450,16 @@ def send_job_pdf():
     try:
         import base64 as b64lib
         data = request.json
-        pdf_base64      = data.get('pdf_base64', '')
-        filename        = data.get('filename', 'Toomey_Proposal.pdf')
-        to_email        = data.get('to_email', '')
-        customer_name   = data.get('customer_name', 'Customer')
-        job_type        = data.get('job_type', '')
-        job_type_label  = data.get('job_type_label', 'Proposal')
-        firebase_id     = data.get('firebase_id', '')
+        pdf_base64        = data.get('pdf_base64', '')
+        to_email          = data.get('to_email', '')
+        customer_name     = data.get('customer_name', 'Customer')
+        customer_address  = data.get('customer_address', '')
+        job_type          = data.get('job_type', '')
+        job_type_label    = data.get('job_type_label', 'Proposal')
+        firebase_id       = data.get('firebase_id', '')
         prepared_by_name  = data.get('prepared_by_name', '')
         prepared_by_email = data.get('prepared_by_email', '')
+        filename          = make_filename(customer_name, customer_address, job_type)
         smtp_password   = data.get('smtp_password', '')
         message         = data.get('message', '')
         cc_office       = data.get('cc_office', True)
