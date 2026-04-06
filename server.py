@@ -7,6 +7,7 @@ from flask_cors import CORS
 import json
 import os
 import subprocess
+import threading
 from datetime import datetime
 import base64 as b64lib_smtp
 import sendgrid
@@ -101,13 +102,21 @@ def generate_pdf():
         with open(pdf_path, 'rb') as f:
             pdf_base64_resp = b64resp.b64encode(f.read()).decode()
 
-        # Save to Google Drive immediately at generate time — this ensures every
-        # New Install proposal has a Drive copy even if the email is never sent
         customer_name    = data.get("customer_name", "Unknown")
         customer_address = data.get("customer_address", "")
         firebase_id      = data.get("firebaseId", pdf_id)
         drive_filename   = make_filename(customer_name, customer_address, 'new_installation')
-        drive_url = save_pdf_to_drive(pdf_path, 'new_installation', firebase_id, drive_filename)
+
+        # Save to Google Drive in background — don't block the response waiting for it.
+        # Every NI still gets a Drive copy even if email is never sent. Drive URL will
+        # appear in the send response (send-job-pdf also saves to Drive).
+        def _bg_drive_save(path, fid, fname):
+            try:
+                save_pdf_to_drive(path, 'new_installation', fid, fname)
+                print(f"Background Drive save complete for {fid}")
+            except Exception as e:
+                print(f"Background Drive save failed for {fid}: {e}")
+        threading.Thread(target=_bg_drive_save, args=(pdf_path, firebase_id, drive_filename), daemon=True).start()
 
         # Store metadata for later sending
         metadata = {
@@ -131,7 +140,6 @@ def generate_pdf():
             "success": True,
             "pdf_id": pdf_id,
             "pdf_base64": pdf_base64_resp,
-            "drive_url": drive_url,
             "download_url": f"/download-pdf/{pdf_id}",
             "preview_url": f"/preview-pdf/{pdf_id}",
             "customer_name": data.get("customer_name"),
@@ -429,15 +437,21 @@ www.ToomeyIrrigation.com{prepared_by_line_txt}""".strip()
         Disposition('attachment')
     )
 
+    print(f"[EMAIL] Sending to={to_email} from={from_email} subject={subject[:60]}")
     sg = sendgrid.SendGridAPIClient(api_key)
     try:
         response = sg.send(message)
+        print(f"[EMAIL] SendGrid response: {response.status_code}")
         if response.status_code not in [200, 202]:
             raise Exception(f"SendGrid error {response.status_code}: {response.body}")
+        print(f"[EMAIL] Sent successfully to {to_email}")
     except Exception as e:
         # Capture detailed SendGrid error body if available
-        if hasattr(e, 'body'):
-            raise Exception(f"SendGrid {getattr(e, 'status_code', 'error')}: {e.body}")
+        body = getattr(e, 'body', None)
+        status = getattr(e, 'status_code', 'error')
+        print(f"[EMAIL] SendGrid FAILED status={status} body={body} err={e}")
+        if body:
+            raise Exception(f"SendGrid {status}: {body}")
         raise
 
 
